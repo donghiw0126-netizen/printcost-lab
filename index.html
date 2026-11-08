@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PrintCost Lab · 3D 프린팅 출력 비용 계산기</title>
-  <meta name="description" content="3D 프린터 출력물 한 개를 뽑는 데 드는 필라멘트비·전기료·감가상각·실패 비용을 계산하고, 사는 것과 직접 뽑는 것 중 무엇이 싼지 비교하세요. 출력물 판매가(수수료·포장·배송·이익률) 계산, Bambu Lab·Prusa·Creality 등 기종별 소비전력 내장.">
+  <meta name="description" content="3D 프린터 출력물 한 개를 뽑는 데 드는 필라멘트비·전기료·감가상각·실패 비용을 계산하고, 사는 것과 직접 뽑는 것 중 무엇이 싼지 비교하세요. G-code·3MF 파일을 올리면 시간·무게 자동 입력. 출력물 판매가(수수료·포장·배송·이익률) 계산, Bambu Lab·Prusa·Creality 등 기종별 소비전력 내장.">
   <meta property="og:title" content="PrintCost Lab · 3D 프린팅 출력 비용 계산기">
   <meta property="og:description" content="이거 뽑으면 얼마? 기종별 소비전력·필라멘트·실패율까지 넣어 진짜 출력 비용을 계산합니다.">
   <meta property="og:type" content="website">
@@ -28,7 +28,62 @@
       <!-- 입력 -->
       <section class="card" aria-labelledby="job-title">
         <h2 id="job-title">이번 출력</h2>
-        <p class="hint">슬라이서(Bambu Studio 등)에서 슬라이스한 뒤 나오는 <b>필라멘트 사용량(g)</b>과 <b>예상 시간</b>을 넣으세요.</p>
+        <p class="hint">슬라이스 파일을 올리면 <b>사용량(g)</b>과 <b>출력 시간</b>이 자동으로 채워져요. 직접 넣어도 돼요.</p>
+
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept=".gcode,.gco,.g,.3mf,.bgcode" hidden>
+          <button type="button" class="btn ghost" id="file-btn">📂 슬라이스 파일 올리기</button>
+          <small class="sub">.gcode · .gcode.3mf — 여기로 끌어다 놓아도 돼요. 파일은 이 브라우저 안에서만 읽고 어디에도 올리지 않아요.</small>
+
+          <details class="howto" id="howto">
+            <summary>파일은 어떻게 저장하나요?</summary>
+            <div class="howto-tabs" role="tablist" aria-label="슬라이서 선택">
+              <button type="button" role="tab" data-tab="bambu">Bambu Studio</button>
+              <button type="button" role="tab" data-tab="orca">OrcaSlicer</button>
+              <button type="button" role="tab" data-tab="prusa">PrusaSlicer</button>
+              <button type="button" role="tab" data-tab="cura">Cura</button>
+            </div>
+
+            <div class="howto-panel" role="tabpanel" data-panel="bambu">
+              <ol>
+                <li>모델을 불러온 뒤 오른쪽 위 <b>‘플레이트 슬라이스’</b>(Slice plate)를 눌러요.</li>
+                <li><b>‘플레이트 출력’</b>(Print plate) 버튼 옆 <b>▼</b>를 누르고 <b>‘플레이트 슬라이스 파일 내보내기’</b>(Export plate sliced file)를 골라요. 위쪽 메뉴 <b>파일 → 내보내기</b>에도 있어요.</li>
+                <li>저장된 <code>○○○.gcode.3mf</code> 파일을 여기에 올려요.</li>
+              </ol>
+              <p class="sub">플레이트가 여러 개면 같은 메뉴의 ‘모든 슬라이스 파일 내보내기’로 저장한 뒤 플레이트를 골라 보세요. 계산기 시간은 슬라이스 화면의 <b>총 시간</b>(예열 포함)과 같아요.</p>
+            </div>
+
+            <div class="howto-panel" role="tabpanel" data-panel="orca" hidden>
+              <ol>
+                <li>오른쪽 위 <b>‘플레이트 슬라이스’</b>(Slice plate)를 눌러요.</li>
+                <li><b>‘플레이트 출력’</b> 옆 <b>▼</b>를 누르고 <b>‘G-code 파일 내보내기’</b>(Export G-code file) 또는 <b>‘플레이트 슬라이스 파일 내보내기’</b>를 골라요.</li>
+                <li>저장된 <code>.gcode</code> 또는 <code>.gcode.3mf</code> 파일을 여기에 올려요.</li>
+              </ol>
+              <p class="sub">Creality Print, Elegoo Slicer 등 OrcaSlicer 기반 슬라이서도 메뉴가 거의 같아요.</p>
+            </div>
+
+            <div class="howto-panel" role="tabpanel" data-panel="prusa" hidden>
+              <ol>
+                <li>오른쪽 아래 <b>‘지금 슬라이스’</b>(Slice now)를 눌러요.</li>
+                <li><b>‘G-code 내보내기’</b>(Export G-code)를 눌러 저장해요.</li>
+                <li>저장된 <code>.gcode</code> 파일을 여기에 올려요.</li>
+              </ol>
+              <p class="sub">MK4·CORE One 등은 기본으로 <b>바이너리 G-code(.bgcode)</b>를 만드는데, 이건 아직 읽지 못해요. <b>프린터 설정 → 일반 → 펌웨어</b>에서 ‘바이너리 G-code 지원’을 끄고 다시 내보내 주세요.</p>
+            </div>
+
+            <div class="howto-panel" role="tabpanel" data-panel="cura" hidden>
+              <ol>
+                <li>오른쪽 아래 <b>‘슬라이스’</b>(Slice)를 눌러요.</li>
+                <li><b>‘디스크에 저장’</b>(Save to Disk)을 눌러 <code>.gcode</code>로 저장해요.</li>
+                <li>저장된 파일을 여기에 올려요.</li>
+              </ol>
+              <p class="sub">Cura는 무게(g)를 적지 않고 길이만 적어서, 1.75mm 필라멘트 기준으로 환산한 <b>추정치</b>가 들어가요. Cura 화면에 나온 g 값으로 고쳐 넣으면 더 정확해요.</p>
+            </div>
+
+            <p class="sub howto-foot">메뉴 이름은 슬라이서 버전·언어 설정에 따라 조금 다를 수 있어요.</p>
+          </details>
+          <div class="import-status" id="import-status" role="status" hidden></div>
+        </div>
 
         <div class="row2">
           <label class="field">
@@ -274,10 +329,11 @@
 
   <footer class="wrap foot">
     <p id="affiliate-note" class="sub" hidden>이 사이트의 일부 구매 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>
-    <p class="sub">PrintCost Lab v<span id="version">0.3.0</span> · 계산 결과는 추정치입니다.</p>
+    <p class="sub">PrintCost Lab v<span id="version">0.4.0</span> · 계산 결과는 추정치입니다.</p>
   </footer>
 
   <script src="logic.js?v=__VERSION__"></script>
+  <script src="importer.js?v=__VERSION__"></script>
   <script src="app.js?v=__VERSION__"></script>
 </body>
 </html>

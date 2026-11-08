@@ -37,7 +37,7 @@ jobs:
       - name: 앱 파일만 모으기 (tests 폴더 등은 공개하지 않음)
         run: |
           mkdir _site
-          cp index.html styles.css logic.js app.js icon.svg _site/
+          cp index.html styles.css logic.js importer.js app.js icon.svg _site/
           # 캐시 갱신용 버전(커밋 번호 앞 7자리)
           sed -i "s#__VERSION__#${GITHUB_SHA::7}#g" _site/index.html
           if grep -q "__VERSION__" _site/index.html; then echo "치환되지 않은 값이 남아 있어요" && exit 1; fi

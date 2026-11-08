@@ -118,6 +118,7 @@ test('guessMaterial', () => {
   assert.equal(L.guessMaterial('PLA-CF'), 'pla');
   assert.equal(L.guessMaterial('ASA'), 'asa');
   assert.equal(L.guessMaterial('PC Blend'), 'pc');
+  assert.equal(L.guessMaterial('PCTG'), 'petg');
   assert.equal(L.guessMaterial('나무 필라멘트'), 'other');
 });
 

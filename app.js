@@ -2,7 +2,8 @@
 // PrintCost Lab 화면 동작. 계산 규칙은 logic.js 에 있습니다.
 (function () {
   const L = window.PrintCostLogic;
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
+  const IM = window.PrintCostImporter;
   const KEY_SETTINGS = 'printcost:settings';
   const KEY_JOB = 'printcost:job';
 
@@ -451,6 +452,7 @@
     renderFilamentList();
     renderSale();
     update();
+    syncHowtoDefault();
   }
 
   // ---------- 이벤트 ----------
@@ -555,6 +557,8 @@
 
   $('clear').addEventListener('click', () => {
     for (const id of jobInputs) $(id).value = '';
+    $('import-status').hidden = true;
+    imported = null;
     saveJob();
     update();
     $('grams').focus();
@@ -573,6 +577,170 @@
     }
     setTimeout(() => { msg.textContent = ''; }, 3000);
   });
+
+  // ---------- 파일 저장 도움말 ----------
+  const KEY_HOWTO = 'printcost:howto-tab';
+  const HOWTO_TABS = ['bambu', 'orca', 'prusa', 'cura'];
+
+  function defaultHowtoTab() {
+    let saved = null;
+    try { saved = localStorage.getItem(KEY_HOWTO); } catch (e) { /* 무시 */ }
+    if (HOWTO_TABS.includes(saved)) return saved;
+    // 처음이면 지금 고른 프린터 브랜드에 맞춤
+    const preset = L.findPreset(activePrinter().presetId);
+    if (preset && preset.brand === 'Prusa') return 'prusa';
+    if (preset && /Creality|Elegoo|Anycubic|Flashforge/.test(preset.brand)) return 'orca';
+    return 'bambu';
+  }
+
+  function setHowtoTab(tab, remember) {
+    for (const b of document.querySelectorAll('.howto-tabs [data-tab]')) {
+      b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+    }
+    for (const p of document.querySelectorAll('.howto-panel')) p.hidden = p.dataset.panel !== tab;
+    if (remember) {
+      try { localStorage.setItem(KEY_HOWTO, tab); } catch (e) { /* 무시 */ }
+    }
+  }
+
+  function openHowto(tab) {
+    const box = $('howto');
+    box.open = true;
+    setHowtoTab(tab || defaultHowtoTab(), false);
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  for (const b of document.querySelectorAll('.howto-tabs [data-tab]')) {
+    b.addEventListener('click', () => setHowtoTab(b.dataset.tab, true));
+  }
+  // 탭을 직접 고른 적이 없으면, 프린터를 바꿀 때 기본 탭도 따라 바뀜 (renderAll 에서 호출)
+  function syncHowtoDefault() {
+    let saved = null;
+    try { saved = localStorage.getItem(KEY_HOWTO); } catch (e) { /* 무시 */ }
+    if (!HOWTO_TABS.includes(saved)) setHowtoTab(defaultHowtoTab(), false);
+  }
+
+  // ---------- 슬라이스 파일 읽기 ----------
+  let imported = null; // { fileName, result, plateIdx }
+
+  function showStatus(kind, ...nodes) {
+    const box = $('import-status');
+    box.hidden = false;
+    box.className = 'import-status ' + kind;
+    box.textContent = '';
+    box.append(...nodes);
+  }
+
+  // 플레이트 값을 입력칸에 채우고, 재료가 다르면 내 필라멘트에서 맞는 걸 고름. 안내 문구 반환.
+  function applyPlate(plate) {
+    if (plate.grams > 0) $('grams').value = String(Math.round(plate.grams * 100) / 100);
+    if (plate.seconds > 0) {
+      const t = IM.splitTime(plate.seconds);
+      $('hours').value = t.hours ? String(t.hours) : '';
+      $('minutes').value = String(t.minutes);
+    }
+    saveJob();
+
+    const notes = [];
+    const kinds = [...new Set(plate.types.map(L.guessMaterial))];
+    if (kinds.length) {
+      const want = kinds[0];
+      const cur = currentFilament();
+      if (cur.type !== want) {
+        const match = settings.filaments.find((f) => f.type === want);
+        if (match) {
+          notes.push(`필라멘트를 ‘${match.name}’(으)로 바꿨어요.`);
+          commit({ ...settings, lastFilamentId: match.id });
+        } else {
+          notes.push(`${materialLabel(want)} 필라멘트가 내 목록에 없어서 ‘${cur.name}’ 가격으로 계산해요.`);
+        }
+      }
+      if (kinds.length > 1) notes.push('여러 재료를 쓴 출력이라 총 무게만 반영했어요.');
+    }
+    if (plate.estimated) notes.push('이 슬라이서는 무게를 적지 않아 길이(1.75mm)로 환산한 추정치예요.');
+    update();
+    return notes;
+  }
+
+  function renderImport(notes) {
+    const { fileName, result, plateIdx } = imported;
+    const plate = result.plates[plateIdx];
+    const head = el('strong', { textContent: `✔ ${result.slicer || '슬라이스'} 파일에서 읽었어요` });
+    const facts = [
+      plate.grams > 0 ? `${Math.round(plate.grams * 100) / 100}g` : '무게 정보 없음',
+      plate.seconds > 0 ? L.formatHours(plate.seconds / 3600) : '시간 정보 없음',
+    ];
+    if (plate.types.length) facts.push([...new Set(plate.types)].join(' + '));
+    const parts = [head, el('span', { className: 'file-name', textContent: fileName }), el('span', { textContent: facts.join(' · ') })];
+
+    if (result.plates.length > 1) {
+      const sel = el('select', { className: 'plate-select' });
+      sel.setAttribute('aria-label', '플레이트 선택');
+      result.plates.forEach((p, i) => {
+        sel.appendChild(el('option', {
+          value: String(i),
+          textContent: `플레이트 ${p.index} — ${Math.round(p.grams * 10) / 10}g · ${L.formatHours(p.seconds / 3600)}`,
+        }));
+      });
+      sel.value = String(plateIdx);
+      sel.addEventListener('change', () => {
+        imported.plateIdx = Number(sel.value);
+        renderImport(applyPlate(imported.result.plates[imported.plateIdx]));
+      });
+      parts.push(el('label', { className: 'plate-pick' }, el('span', { textContent: `플레이트 ${result.plates.length}개 중` }), sel));
+    }
+    if (plate.objects > 1) parts.push(el('span', { className: 'sub', textContent: `이 플레이트에 객체 ${plate.objects}개 — 같은 물건이면 ‘한 판에 나오는 개수’에 넣어 주세요.` }));
+    for (const n of notes || []) parts.push(el('span', { className: 'note-line', textContent: n }));
+    showStatus('ok', ...parts);
+  }
+
+  async function handleFile(file) {
+    if (!file) return;
+    showStatus('loading', el('span', { textContent: `‘${file.name}’ 읽는 중…` }));
+    try {
+      const result = await IM.importFile(file);
+      imported = { fileName: file.name, result, plateIdx: 0 };
+      renderImport(applyPlate(result.plates[0]));
+    } catch (e) {
+      imported = null;
+      const msg = e instanceof IM.ImportError ? e.message : '파일을 읽는 중 문제가 생겼어요. 다른 파일로 시도하거나 직접 입력해 주세요.';
+      if (!(e instanceof IM.ImportError)) console.error(e);
+      // 오류 종류에 맞는 도움말 탭 열기 버튼
+      const tab = e.kind === 'bgcode' ? 'prusa' : e.kind === 'project' ? 'bambu' : null;
+      const help = el('button', { type: 'button', className: 'link-btn', textContent: '파일 저장 방법 보기 →' });
+      help.addEventListener('click', () => openHowto(tab));
+      showStatus('error', el('strong', { textContent: '읽지 못했어요' }), el('span', { textContent: msg }), help);
+    }
+  }
+
+  $('file-btn').addEventListener('click', () => $('file-input').click());
+  $('file-input').addEventListener('change', (e) => {
+    handleFile(e.target.files[0]);
+    e.target.value = ''; // 같은 파일을 다시 골라도 동작하게
+  });
+
+  // 끌어다 놓기: "이번 출력" 카드 전체가 놓는 곳
+  const dropCard = $('dropzone').closest('.card');
+  let dragDepth = 0;
+  dropCard.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragDepth++;
+    dropCard.classList.add('dragging');
+  });
+  dropCard.addEventListener('dragover', (e) => e.preventDefault());
+  dropCard.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) dropCard.classList.remove('dragging');
+  });
+  dropCard.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    dropCard.classList.remove('dragging');
+    handleFile(e.dataTransfer && e.dataTransfer.files[0]);
+  });
+  // 카드 밖에 떨어뜨려도 브라우저가 파일을 열어 버리지 않게
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
 
   // ---------- 시작 ----------
   $('version').textContent = VERSION;

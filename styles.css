@@ -180,6 +180,36 @@ output { color: var(--accent); font-variant-numeric: tabular-nums; }
 .check input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--accent); }
 .disabled { opacity: 0.45; }
 
+/* 슬라이스 파일 올리기 */
+.dropzone { border: 1.5px dashed var(--line); border-radius: 12px; padding: 14px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; background: var(--field); }
+.card.dragging { outline: 2px dashed var(--accent); outline-offset: -6px; background: var(--accent-soft); }
+.card.dragging .dropzone { border-color: var(--accent); }
+.import-status { width: 100%; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; font-size: 0.9rem; }
+.import-status[hidden] { display: none; }
+.import-status.ok { background: var(--good-soft); color: var(--good); }
+.import-status.error { background: var(--bad-soft); color: var(--bad); }
+.import-status.loading { background: var(--card); color: var(--muted); }
+.import-status .file-name { font-size: 0.8rem; opacity: 0.8; word-break: break-all; }
+.import-status .note-line { color: var(--ink); font-size: 0.85rem; }
+.import-status .sub { color: var(--ink); opacity: 0.75; }
+.plate-pick { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; font-size: 0.82rem; }
+.plate-pick select { padding: 8px 10px; }
+
+/* 파일 저장 도움말 */
+.howto { width: 100%; }
+.howto > summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 0.88rem; padding: 2px 0; }
+.howto[open] > summary { margin-bottom: 10px; }
+.howto-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.howto-tabs button { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 11px; font-size: 0.82rem; cursor: pointer; }
+.howto-tabs button[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.howto-panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; }
+.howto-panel ol { margin: 0 0 6px; padding-left: 20px; }
+.howto-panel li { margin-bottom: 5px; }
+.howto-panel p { margin: 0; }
+.howto-panel code { font-size: 0.82rem; background: var(--field); padding: 1px 5px; border-radius: 4px; }
+.howto-foot { margin: 8px 0 0; }
+.import-status .link-btn { text-align: left; margin-top: 4px; min-width: 0; }
+
 /* 판매가 계산 */
 .settings.sale summary h2 { color: var(--accent); }
 .sale-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: start; }

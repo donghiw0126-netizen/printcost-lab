@@ -335,6 +335,7 @@
     if (n.includes('ASA')) return 'asa';
     if (n.includes('ABS')) return 'abs';
     if (n.includes('TPU')) return 'tpu';
+    if (n.includes('PCTG')) return 'petg'; // PCTG 는 PETG 계열
     if (/\bPC\b|^PC/.test(n)) return 'pc';
     if (n.includes('PLA')) return 'pla';
     return 'other';
