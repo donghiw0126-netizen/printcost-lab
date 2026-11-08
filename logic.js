@@ -115,11 +115,12 @@
   //  - 쿠팡: 생활용품 판매수수료 7.8% + VAT
   //  - 아이디어스: 멤버십 없을 때 22%로 보수적으로 잡음(멤버십 가입 시 15% 안팎)
   const PLATFORMS = [
-    { id: 'smartstore', label: '스마트스토어', fee: 6.6, note: '신규(일반 등급)·네이버쇼핑 유입 기준. 영세 등급 약 5%, 직접 만든 마케팅 링크로 들어온 주문은 약 3%.' },
-    { id: 'coupang', label: '쿠팡 (생활용품)', fee: 8.6, note: '생활용품 7.8% + 부가세. 완구·취미 등 카테고리에 따라 더 높을 수 있어요.' },
-    { id: 'idus', label: '아이디어스', fee: 22, note: '멤버십 없을 때 기준(보수적). 멤버십에 가입하면 15% 안팎으로 낮아진다고 알려져 있어요.' },
-    { id: 'daangn', label: '당근', fee: 0, note: '수수료는 없지만 중고거래 서비스라, 새 물건을 반복해서 파는 건 정책상 제한될 수 있어요.' },
-    { id: 'custom', label: '직접 입력', fee: 0, note: '크몽·오프라인 판매 등 수수료를 직접 넣으세요.' },
+    // tag: 수수료 숫자 바로 옆에 붙이는 짧은 조건
+    { id: 'smartstore', label: '스마트스토어', fee: 6.6, tag: '일반 등급·네이버쇼핑 유입', note: '신규 판매자는 일반 등급이에요. 영세 등급 약 5%, 직접 만든 마케팅 링크로 들어온 주문은 약 3%.' },
+    { id: 'coupang', label: '쿠팡', fee: 8.6, tag: '생활용품 카테고리', note: '생활용품 7.8% + 부가세. 완구·취미 등 카테고리에 따라 더 높을 수 있어요.' },
+    { id: 'idus', label: '아이디어스', fee: 22, tag: '멤버십 없을 때', note: '보수적으로 잡은 값이에요. 멤버십에 가입하면 15% 안팎으로 낮아진다고 알려져 있어요.' },
+    { id: 'daangn', label: '당근', fee: 0, tag: '수수료 없음', note: '중고거래 서비스라, 새 물건을 반복해서 파는 건 정책상 제한될 수 있어요.' },
+    { id: 'custom', label: '직접 입력', fee: 0, tag: '', note: '크몽·오프라인 판매 등 수수료를 직접 넣으세요.' },
   ];
   const MAX_MARGIN = 60; // 화면 슬라이더 최대값과 같게
 
@@ -305,12 +306,37 @@
     return m === 0 ? h + '시간' : h + '시간 ' + m + '분';
   }
 
-  // 공유용 요약
-  function summaryText(result, job, filament, printer) {
+  // 계산 조건 한 줄: 결과 카드·복사 문구·판매가 칸에서 똑같이 씀
+  //   depreciation: 'included' | 'off'(직접 끔) | 'missing'(포함인데 가격 미입력)
+  //   warn: 빠진 비용이 있으면 true
+  function conditions(printer, failRate) {
+    const p = printer || {};
+    const depreciation = !p.includeDepreciation ? 'off' : p.price > 0 ? 'included' : 'missing';
+    const depText = {
+      included: '감가상각 포함',
+      off: '감가상각 제외',
+      missing: '감가상각 미포함(프린터 가격 미입력)',
+    }[depreciation];
+    const r = clamp(failRate || 0, 0, MAX_FAIL_RATE);
+    const failText = r > 0 ? `실패율 ${r}% 적용` : '실패율 미적용';
+    return { depreciation, text: `${depText} · ${failText}`, warn: depreciation !== 'included' };
+  }
+
+  // 금액 한 줄: "한 판 582원 · 1개당 291원" / 1개면 "1,234원"
+  function amountLine(result) {
+    return result.pieces > 1
+      ? `한 판 ${formatWon(result.total)} · 1개당 ${formatWon(result.perPiece)}`
+      : formatWon(result.total);
+  }
+
+  // 공유용 요약 (결과 카드와 같은 형태)
+  function summaryText(result, job, filament, printer, failRate) {
     const lines = [
-      '🖨️ PrintCost Lab 계산 결과',
-      `${printer ? printer.name + ' · ' : ''}${filament ? filament.name : '필라멘트'} ${job.grams}g · ${formatHours(job.hours)}`,
-      `총 ${formatWon(result.total)}` + (result.pieces > 1 ? ` (1개당 ${formatWon(result.perPiece)})` : ''),
+      '🖨️ PrintCost Lab 출력 비용',
+      `${printer ? printer.name + ' · ' : ''}${filament ? filament.name : '필라멘트'} ${job.grams}g · ${formatHours(job.hours)}`
+        + (result.pieces > 1 ? ` · 한 판 ${result.pieces}개` : ''),
+      amountLine(result),
+      conditions(printer, failRate).text,
     ];
     return lines.join('\n');
   }
@@ -498,7 +524,7 @@
     DEFAULT_FILAMENTS, KWH_PRESETS, DEFAULT_KWH_RATE,
     parseNumber, toHours, costPerGram, calcCost, compare, powerFor, printerSource,
     findPreset, presetLabel, newPrinter, changePreset, guessMaterial,
-    formatWon, formatHours, summaryText,
+    formatWon, formatHours, summaryText, conditions, amountLine,
     newId, defaultSettings, normalizeSettings,
   };
 });

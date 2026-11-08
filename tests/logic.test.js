@@ -267,3 +267,34 @@ test('PLATFORMS: id 중복 없고 수수료 0~99%', () => {
   assert.equal(ids.size, L.PLATFORMS.length);
   for (const p of L.PLATFORMS) assert.ok(p.fee >= 0 && p.fee < 100 && p.note, p.id);
 });
+
+// ---------- v0.4.1 계산 조건 표시 ----------
+test('conditions: 감가상각 포함/제외/가격 미입력, 실패율', () => {
+  const base = L.newPrinter('bambu-p1s');
+  const inc = L.conditions({ ...base, price: 900000 }, 5);
+  assert.equal(inc.depreciation, 'included');
+  assert.equal(inc.text, '감가상각 포함 · 실패율 5% 적용');
+  assert.equal(inc.warn, false);
+  const missing = L.conditions({ ...base, price: 0 }, 5);
+  assert.equal(missing.depreciation, 'missing');
+  assert.equal(missing.warn, true);
+  assert.match(missing.text, /미포함/);
+  const off = L.conditions({ ...base, includeDepreciation: false }, 0);
+  assert.equal(off.text, '감가상각 제외 · 실패율 미적용');
+  assert.equal(off.warn, true);
+});
+
+test('amountLine / summaryText: 결과 카드와 같은 형태, 조건 포함', () => {
+  const P1 = { ...L.newPrinter('bambu-p1s'), price: 0 };
+  const r = L.calcCost({ grams: 20, hours: 1, pieces: 2 }, PLA, P1, { failRate: 5, kwhRate: 215 });
+  assert.match(L.amountLine(r), /^한 판 .+원 · 1개당 .+원$/);
+  const one = L.calcCost({ grams: 20, hours: 1, pieces: 1 }, PLA, P1, { failRate: 5, kwhRate: 215 });
+  assert.equal(L.amountLine(one), L.formatWon(one.total));
+  const text = L.summaryText(r, { grams: 20, hours: 1 }, PLA, P1, 5);
+  assert.match(text, /한 판 2개/);
+  assert.match(text, /감가상각 미포함\(프린터 가격 미입력\) · 실패율 5% 적용/);
+});
+
+test('PLATFORMS: 직접 입력 외에는 수수료 옆에 붙일 조건(tag)이 있음', () => {
+  for (const p of L.PLATFORMS) if (p.id !== 'custom') assert.ok(p.tag, p.id);
+});

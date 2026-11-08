@@ -137,12 +137,15 @@
           <span id="total">0원</span>
           <small id="per-piece"></small>
         </div>
+        <p class="conditions" id="conditions"></p>
 
         <div class="bar" id="bar" aria-hidden="true"></div>
         <ul class="breakdown" id="breakdown"></ul>
         <p class="sub" id="kwh"></p>
 
         <div class="compare" id="compare" hidden></div>
+
+        <button type="button" id="to-sale" class="to-sale">이 원가로 판매가 계산 →</button>
 
         <div class="actions">
           <button type="button" id="copy" class="btn">결과 복사</button>
@@ -165,7 +168,7 @@
                 <select id="s-platform"></select>
               </label>
               <label class="field">
-                <span>수수료</span>
+                <span>수수료 <small class="opt" id="s-fee-tag"></small></span>
                 <div class="unit-input"><input id="s-fee" inputmode="decimal" autocomplete="off"><em>%</em></div>
               </label>
             </div>
@@ -208,6 +211,7 @@
           <div class="sale-result" aria-live="polite">
             <h3>권장 판매가</h3>
             <div class="total"><span id="s-price">-</span><small id="s-price-sub"></small></div>
+            <p class="conditions" id="s-basis"></p>
             <ul class="breakdown" id="s-costs"></ul>
             <p class="sub" id="s-breakeven"></p>
 
@@ -329,7 +333,7 @@
 
   <footer class="wrap foot">
     <p id="affiliate-note" class="sub" hidden>이 사이트의 일부 구매 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>
-    <p class="sub">PrintCost Lab v<span id="version">0.4.0</span> · 계산 결과는 추정치입니다.</p>
+    <p class="sub">PrintCost Lab v<span id="version">0.4.1</span> · 계산 결과는 추정치입니다.</p>
   </footer>
 
   <script src="logic.js?v=__VERSION__"></script>

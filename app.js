@@ -2,7 +2,7 @@
 // PrintCost Lab 화면 동작. 계산 규칙은 logic.js 에 있습니다.
 (function () {
   const L = window.PrintCostLogic;
-  const VERSION = '0.4.0';
+  const VERSION = '0.4.1';
   const IM = window.PrintCostImporter;
   const KEY_SETTINGS = 'printcost:settings';
   const KEY_JOB = 'printcost:job';
@@ -164,7 +164,8 @@
     const r = L.calcCost(safe, f, p, { failRate: settings.failRate, kwhRate: settings.kwhRate });
 
     $('total').textContent = L.formatWon(r.total);
-    $('per-piece').textContent = r.pieces > 1 ? `1개당 ${L.formatWon(r.perPiece)} · ${r.pieces}개` : '';
+    $('per-piece').textContent = r.pieces > 1 && r.total > 0 ? `한 판 ${r.pieces}개 · 1개당 ${L.formatWon(r.perPiece)}` : '';
+    renderConditions($('conditions'), p);
 
     const items = [
       ['filament', r.parts.filament],
@@ -218,18 +219,32 @@
       box.append(
         el('strong', {
           textContent: c.cheaper
-            ? `직접 뽑으면 1개당 ${L.formatWon(c.saving)} 아껴요`
-            : `사는 게 1개당 ${L.formatWon(-c.saving)} 더 싸요`,
+            ? `직접 출력비 기준으로 1개당 ${L.formatWon(c.saving)} 절약`
+            : `직접 출력비만 봐도 사는 게 1개당 ${L.formatWon(-c.saving)} 더 싸요`,
         }),
         el('span', {
           textContent: c.cheaper
-            ? `사는 값보다 ${Math.round(c.percent)}% 저렴`
-            : '시간·수고까지 생각하면 구매가 나을 수 있어요',
+            ? `완제품 가격보다 ${Math.round(c.percent)}% 저렴 · 손질·디자인 시간은 빠진 비교예요`
+            : '손질 시간까지 생각하면 구매가 더 나을 수 있어요',
         }),
       );
     }
     lastResult = { r, job: safe, f, p };
-    updateSale(safe.grams > 0 || safe.hours > 0 ? r.perPiece : 0);
+    updateSale(safe.grams > 0 || safe.hours > 0 ? r.perPiece : 0, p);
+    refreshApplied();
+  }
+
+  // 계산 조건 한 줄 (감가상각 포함 여부 · 실패율). 빠진 비용이 있으면 경고 색 + 가격 입력 버튼
+  function renderConditions(node, printer, prefix) {
+    const c = L.conditions(printer, settings.failRate);
+    node.textContent = '';
+    node.classList.toggle('warn', c.warn);
+    node.append((c.warn ? '⚠ ' : '') + (prefix || '') + c.text);
+    if (c.depreciation === 'missing') {
+      const b = el('button', { type: 'button', className: 'link-btn', textContent: '가격 입력 →' });
+      b.addEventListener('click', focusPrice);
+      node.append(' ', b);
+    }
   }
 
   // ---------- 판매가 계산 ----------
@@ -242,8 +257,12 @@
     sel.value = s.platformId;
     const platform = L.findPlatform(s.platformId);
     $('s-fee').value = String(s.fee);
-    $('s-platform-note').textContent = platform.note
-      + (s.fee !== platform.fee && platform.id !== 'custom' ? ` (기본값 ${platform.fee}%에서 고친 값)` : '');
+    // 수수료 숫자 바로 옆에 어떤 조건의 값인지
+    const edited = platform.id !== 'custom' && s.fee !== platform.fee;
+    $('s-fee-tag').textContent = edited
+      ? `(직접 수정 · 기본 ${platform.fee}%)`
+      : platform.tag ? `(${platform.tag})` : '';
+    $('s-platform-note').textContent = platform.note;
     $('s-wage').value = s.hourlyWage.toLocaleString('ko-KR');
     $('s-pack').value = s.packaging.toLocaleString('ko-KR');
     $('s-ship').value = s.shipping.toLocaleString('ko-KR');
@@ -252,8 +271,12 @@
     $('s-margin-out').textContent = s.margin + '%';
   }
 
-  function updateSale(unitCost) {
+  function updateSale(unitCost, printer) {
     const s = settings.sale;
+    // 어떤 원가를 기준으로 계산했는지 (감가상각이 빠졌으면 판매가에도 빠짐)
+    const basis = $('s-basis');
+    basis.hidden = !(unitCost > 0);
+    if (unitCost > 0) renderConditions(basis, printer || activePrinter(), `기준 원가 1개당 ${L.formatWon(unitCost)} · `);
     const postRaw = $('s-post').value.trim();
     const post = postRaw === '' ? 0 : L.parseNumber(postRaw);
     const costs = L.saleCosts(unitCost, { ...s, postMinutes: Number.isNaN(post) ? 0 : post });
@@ -555,6 +578,14 @@
     }
   });
 
+  // 결과 카드 → 판매가 계산 칸 펼치고 이동
+  $('to-sale').addEventListener('click', () => {
+    const box = $('sale-box');
+    box.open = true;
+    box.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setTimeout(() => $('s-post').focus({ preventScroll: true }), 300);
+  });
+
   $('clear').addEventListener('click', () => {
     for (const id of jobInputs) $(id).value = '';
     $('import-status').hidden = true;
@@ -567,7 +598,7 @@
   $('copy').addEventListener('click', async () => {
     if (!lastResult) return;
     const { r, job, f, p } = lastResult;
-    const text = L.summaryText(r, job, f, p) + '\n' + location.href.split('#')[0];
+    const text = L.summaryText(r, job, f, p, settings.failRate) + '\n' + location.href.split('#')[0];
     const msg = $('copy-msg');
     try {
       await navigator.clipboard.writeText(text);
@@ -639,9 +670,16 @@
       $('hours').value = t.hours ? String(t.hours) : '';
       $('minutes').value = String(t.minutes);
     }
+    const notes = [];
+    // 3MF 에 객체 수가 있으면 한 판 개수를 자동으로 맞춤 (1개면 1로 — 이전 값이 남지 않게)
+    if (plate.objects >= 1) {
+      const before = $('pieces').value.trim() || '1';
+      $('pieces').value = String(plate.objects);
+      if (plate.objects > 1) notes.push(`한 판 개수를 객체 수(${plate.objects}개)로 맞췄어요.`);
+      else if (before !== '1') notes.push('객체가 1개라 한 판 개수를 1개로 맞췄어요.');
+    }
     saveJob();
 
-    const notes = [];
     const kinds = [...new Set(plate.types.map(L.guessMaterial))];
     if (kinds.length) {
       const want = kinds[0];
@@ -665,13 +703,17 @@
   function renderImport(notes) {
     const { fileName, result, plateIdx } = imported;
     const plate = result.plates[plateIdx];
-    const head = el('strong', { textContent: `✔ ${result.slicer || '슬라이스'} 파일에서 읽었어요` });
-    const facts = [
-      plate.grams > 0 ? `${Math.round(plate.grams * 100) / 100}g` : '무게 정보 없음',
-      plate.seconds > 0 ? L.formatHours(plate.seconds / 3600) : '시간 정보 없음',
+    const got = [
+      plate.grams > 0 ? `${Math.round(plate.grams * 100) / 100}g` : null,
+      plate.seconds > 0 ? L.formatHours(plate.seconds / 3600) : null,
+    ].filter(Boolean).join(' · ');
+    const head = el('strong', { textContent: `✔ ${got || '파일'}을 가져왔어요` });
+    const from = [result.slicer, fileName].filter(Boolean).join(' · ');
+    const fileTypes = [...new Set(plate.types)];
+    const parts = [
+      head,
+      el('span', { className: 'file-name', textContent: from + (fileTypes.length ? ` · 파일 재료: ${fileTypes.join(' + ')}` : '') }),
     ];
-    if (plate.types.length) facts.push([...new Set(plate.types)].join(' + '));
-    const parts = [head, el('span', { className: 'file-name', textContent: fileName }), el('span', { textContent: facts.join(' · ') })];
 
     if (result.plates.length > 1) {
       const sel = el('select', { className: 'plate-select' });
@@ -689,9 +731,51 @@
       });
       parts.push(el('label', { className: 'plate-pick' }, el('span', { textContent: `플레이트 ${result.plates.length}개 중` }), sel));
     }
-    if (plate.objects > 1) parts.push(el('span', { className: 'sub', textContent: `이 플레이트에 객체 ${plate.objects}개 — 같은 물건이면 ‘한 판에 나오는 개수’에 넣어 주세요.` }));
     for (const n of notes || []) parts.push(el('span', { className: 'note-line', textContent: n }));
+
+    // 파일에 없는 값(필라멘트·개수)은 이전 설정이 남아 있으니, 지금 적용된 값을 그대로 보여 줌
+    const check = el('button', { type: 'button', className: 'link-btn', textContent: '설정 확인' });
+    check.addEventListener('click', () => {
+      const sel = $('filament');
+      sel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      sel.focus();
+      for (const id of ['filament', 'pieces']) {
+        $(id).classList.add('flash');
+        setTimeout(() => $(id).classList.remove('flash'), 1600);
+      }
+    });
+    const pieceBtn = el('button', { type: 'button', className: 'link-btn', id: 'import-pieces' });
+    pieceBtn.addEventListener('click', () => {
+      // 지금 객체 수로 맞춰져 있으면 → 1개로(서로 다른 부품), 아니면 → 객체 수로
+      $('pieces').value = pieceBtn.dataset.target;
+      saveJob();
+      update();
+    });
+    parts.push(el('div', { className: 'applied' },
+      el('span', { className: 'applied-label', textContent: '이번 출력에 적용할 값' }),
+      el('span', { className: 'applied-row' }, el('b', { id: 'import-applied' }), ' ', check),
+      pieceBtn));
     showStatus('ok', ...parts);
+    refreshApplied();
+  }
+
+  // 적용값 줄을 지금 입력 상태로 갱신 (필라멘트·개수를 바꾸면 바로 반영)
+  function refreshApplied() {
+    const node = $('import-applied');
+    if (!imported || !node) return;
+    const pieces = L.parseNumber($('pieces').value.trim());
+    const n = Number.isFinite(pieces) && pieces >= 1 ? Math.floor(pieces) : 1;
+    node.textContent = `${currentFilament().name} · 한 판에 ${n}개`;
+    const plate = imported.result.plates[imported.plateIdx];
+    const btn = $('import-pieces');
+    btn.hidden = !(plate.objects > 1);
+    if (n === plate.objects) {
+      btn.dataset.target = '1';
+      btn.textContent = '서로 다른 부품이면 → 한 판 1개로';
+    } else {
+      btn.dataset.target = String(plate.objects);
+      btn.textContent = `객체 수대로 → 한 판 ${plate.objects}개로`;
+    }
   }
 
   async function handleFile(file) {
@@ -709,7 +793,14 @@
       const tab = e.kind === 'bgcode' ? 'prusa' : e.kind === 'project' ? 'bambu' : null;
       const help = el('button', { type: 'button', className: 'link-btn', textContent: '파일 저장 방법 보기 →' });
       help.addEventListener('click', () => openHowto(tab));
-      showStatus('error', el('strong', { textContent: '읽지 못했어요' }), el('span', { textContent: msg }), help);
+      // 다시 내보내지 않고 계산을 계속할 수 있게
+      const manual = el('button', { type: 'button', className: 'link-btn', textContent: '직접 입력하기 →' });
+      manual.addEventListener('click', () => {
+        $('grams').scrollIntoView({ block: 'center', behavior: 'smooth' });
+        $('grams').focus();
+      });
+      showStatus('error', el('strong', { textContent: '읽지 못했어요' }), el('span', { textContent: msg }),
+        el('span', { className: 'error-actions' }, help, manual));
     }
   }
 
