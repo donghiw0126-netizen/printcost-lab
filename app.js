@@ -12,6 +12,13 @@
   // 예: pla: 'https://link.coupang.com/a/xxxx'
   const SHOP_LINKS = {};
 
+  // 의견 보내기 주소 (구글 폼 등). 넣으면 아래쪽에 "의견 보내기" 링크가 나타납니다.
+  const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf2aiuLAHnbV9aDE4hlcFNY1SJabXnsztPW8A_mlX6SouAk-g/viewform';
+
+  // Cloudflare Web Analytics 토큰. 넣으면 쿠키 없는 방문 통계가 켜지고 안내 문구가 나타납니다.
+  // (Cloudflare 대시보드 → Web Analytics → 사이트 추가 → JS 스니펫의 "token" 값)
+  const ANALYTICS_TOKEN = '1832be88f3664cfe854dc33c136df656';
+
   const $ = (id) => document.getElementById(id);
   const el = (tag, props, ...children) => {
     const e = document.createElement(tag);
@@ -836,6 +843,24 @@
   // ---------- 시작 ----------
   $('version').textContent = VERSION;
   $('affiliate-note').hidden = Object.keys(SHOP_LINKS).length === 0;
+
+  if (/^https:\/\//.test(FEEDBACK_URL)) {
+    const links = $('foot-links');
+    links.append(el('a', {
+      href: FEEDBACK_URL, target: '_blank', rel: 'noopener', className: 'feedback',
+      textContent: '💬 의견 보내기 — 불편한 점·원하는 기능을 알려 주세요',
+    }));
+    links.hidden = false;
+  }
+
+  if (/^[0-9a-f]{32}$/i.test(ANALYTICS_TOKEN)) {
+    const s = document.createElement('script');
+    s.defer = true;
+    s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+    s.setAttribute('data-cf-beacon', JSON.stringify({ token: ANALYTICS_TOKEN }));
+    document.head.appendChild(s);
+    $('analytics-note').hidden = false;
+  }
   save(KEY_SETTINGS, settings); // v0.1 설정이면 새 형식으로 바로 저장
   renderAll();
 })();

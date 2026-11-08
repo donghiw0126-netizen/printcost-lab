@@ -305,3 +305,6 @@ input.need::placeholder { color: var(--accent); }
 
 .foot { padding-top: 8px; padding-bottom: 32px; border-top: 1px solid var(--line); }
 .foot p { margin: 8px 0; }
+.foot-links[hidden] { display: none; }
+.feedback { display: inline-block; color: var(--accent); font-weight: 600; text-decoration: none; padding: 8px 0; }
+.feedback:hover { text-decoration: underline; }

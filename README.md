@@ -8,3 +8,11 @@
 - 슬라이스 파일(.gcode, .gcode.3mf)을 올리면 사용량·시간 자동 입력 — 브라우저 안에서만 읽음
 - `npm start` — http://localhost:8003 에서 미리 보기
 - 구매 링크(쿠팡 파트너스 등)는 `app.js` 의 `SHOP_LINKS` 에 넣으면 버튼과 고지 문구가 자동으로 나타납니다.
+
+## 홍보·운영 설정 (app.js 맨 위)
+
+- `SHOP_LINKS` — 필라멘트 구매 링크(쿠팡 파트너스 등). 넣으면 구매 버튼과 고지 문구 표시
+- `FEEDBACK_URL` — 의견 보내기 주소(구글 폼 등). 넣으면 아래쪽에 링크 표시
+- `ANALYTICS_TOKEN` — Cloudflare Web Analytics 토큰(32자리). 넣으면 쿠키 없는 방문 통계와 안내 문구 표시
+- 검색 등록 인증 meta 태그는 `index.html` 의 주석 자리에 붙여 넣기
+- 공유 미리보기 이미지 `og-image.png` 는 `tools/og-image.html` 을 1200×630 으로 스크린샷해서 다시 만들 수 있음
