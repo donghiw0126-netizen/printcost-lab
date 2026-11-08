@@ -1,0 +1,10 @@
+{
+  "name": "printcost-lab",
+  "version": "0.3.0",
+  "private": true,
+  "description": "3D 프린팅 출력 비용 계산기 — 필라멘트·전기료·감가상각·실패율, 사기 vs 뽑기 비교",
+  "scripts": {
+    "test": "node --test",
+    "start": "py -m http.server 8003"
+  }
+}

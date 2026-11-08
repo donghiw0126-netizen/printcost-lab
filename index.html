@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PrintCost Lab · 3D 프린팅 출력 비용 계산기</title>
+  <meta name="description" content="3D 프린터 출력물 한 개를 뽑는 데 드는 필라멘트비·전기료·감가상각·실패 비용을 계산하고, 사는 것과 직접 뽑는 것 중 무엇이 싼지 비교하세요. 출력물 판매가(수수료·포장·배송·이익률) 계산, Bambu Lab·Prusa·Creality 등 기종별 소비전력 내장.">
+  <meta property="og:title" content="PrintCost Lab · 3D 프린팅 출력 비용 계산기">
+  <meta property="og:description" content="이거 뽑으면 얼마? 기종별 소비전력·필라멘트·실패율까지 넣어 진짜 출력 비용을 계산합니다.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#f6f4ef">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=__VERSION__">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="./">
+        <img src="icon.svg" alt="" width="28" height="28">
+        <span>PrintCost <b>Lab</b></span>
+      </a>
+      <p class="tagline">이거 뽑으면 얼마? 3D 프린팅 출력 비용 계산기</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="grid">
+      <!-- 입력 -->
+      <section class="card" aria-labelledby="job-title">
+        <h2 id="job-title">이번 출력</h2>
+        <p class="hint">슬라이서(Bambu Studio 등)에서 슬라이스한 뒤 나오는 <b>필라멘트 사용량(g)</b>과 <b>예상 시간</b>을 넣으세요.</p>
+
+        <div class="row2">
+          <label class="field">
+            <span>프린터</span>
+            <select id="printer"></select>
+          </label>
+          <label class="field">
+            <span>필라멘트</span>
+            <select id="filament"></select>
+          </label>
+        </div>
+        <p id="pick-hint" class="sub pick-hint"></p>
+
+        <div class="row2">
+          <label class="field">
+            <span>사용량</span>
+            <div class="unit-input"><input id="grams" inputmode="decimal" placeholder="0" autocomplete="off"><em>g</em></div>
+          </label>
+          <label class="field">
+            <span>한 판에 나오는 개수</span>
+            <div class="unit-input"><input id="pieces" inputmode="numeric" placeholder="1" autocomplete="off"><em>개</em></div>
+          </label>
+        </div>
+
+        <div class="field">
+          <span id="time-label">출력 시간</span>
+          <div class="row2" role="group" aria-labelledby="time-label">
+            <div class="unit-input"><input id="hours" inputmode="numeric" placeholder="0" aria-label="시간" autocomplete="off"><em>시간</em></div>
+            <div class="unit-input"><input id="minutes" inputmode="numeric" placeholder="0" aria-label="분" autocomplete="off"><em>분</em></div>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>실패율 <output id="fail-out">5%</output></span>
+          <input id="fail" type="range" min="0" max="50" step="1">
+          <small class="sub">10번 중 1번 실패하면 10%. 실패한 출력의 재료·전기도 원가에 들어갑니다.</small>
+        </label>
+
+        <label class="field">
+          <span>사면 얼마? <small class="opt">(선택, 1개 가격)</small></span>
+          <div class="unit-input"><input id="store" inputmode="numeric" placeholder="예: 8,900" autocomplete="off"><em>원</em></div>
+        </label>
+
+        <p id="job-error" class="error" role="alert" hidden></p>
+      </section>
+
+      <!-- 결과 -->
+      <section class="card result" aria-labelledby="result-title" aria-live="polite">
+        <h2 id="result-title">출력 비용</h2>
+        <div class="total">
+          <span id="total">0원</span>
+          <small id="per-piece"></small>
+        </div>
+
+        <div class="bar" id="bar" aria-hidden="true"></div>
+        <ul class="breakdown" id="breakdown"></ul>
+        <p class="sub" id="kwh"></p>
+
+        <div class="compare" id="compare" hidden></div>
+
+        <div class="actions">
+          <button type="button" id="copy" class="btn">결과 복사</button>
+          <button type="button" id="clear" class="btn ghost">입력 지우기</button>
+        </div>
+        <p id="copy-msg" class="sub" role="status"></p>
+      </section>
+    </div>
+
+    <!-- 판매가 계산 -->
+    <details class="card settings sale" id="sale-box">
+      <summary><h2>팔면 얼마 받아야 할까?</h2><span class="sub" id="sale-summary"></span></summary>
+      <div class="settings-body">
+        <p class="hint">위에서 계산한 <b>1개당 출력 원가</b>에 손질·포장·배송비와 판매처 수수료를 더해 권장 판매가를 계산해요.</p>
+        <div class="sale-grid">
+          <div>
+            <div class="row2">
+              <label class="field">
+                <span>판매처</span>
+                <select id="s-platform"></select>
+              </label>
+              <label class="field">
+                <span>수수료</span>
+                <div class="unit-input"><input id="s-fee" inputmode="decimal" autocomplete="off"><em>%</em></div>
+              </label>
+            </div>
+            <p class="sub pick-hint" id="s-platform-note"></p>
+
+            <div class="row2">
+              <label class="field">
+                <span>후가공 시간 <small class="opt">(1개)</small></span>
+                <div class="unit-input"><input id="s-post" inputmode="numeric" placeholder="0" autocomplete="off"><em>분</em></div>
+              </label>
+              <label class="field">
+                <span>내 시급</span>
+                <div class="unit-input"><input id="s-wage" inputmode="numeric" autocomplete="off"><em>원</em></div>
+              </label>
+            </div>
+            <p class="sub pick-hint">서포트 제거·사포질·조립·포장에 드는 시간. 내 시간을 0원으로 치면 팔수록 손해 보기 쉬워요.</p>
+
+            <div class="row2">
+              <label class="field">
+                <span>포장비 <small class="opt">(1개)</small></span>
+                <div class="unit-input"><input id="s-pack" inputmode="numeric" autocomplete="off"><em>원</em></div>
+              </label>
+              <label class="field">
+                <span>배송비</span>
+                <div class="unit-input"><input id="s-ship" inputmode="numeric" autocomplete="off"><em>원</em></div>
+              </label>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="s-free">
+              <span>무료배송 <small class="sub">(배송비를 내가 부담 → 판매가에 포함)</small></span>
+            </label>
+
+            <label class="field">
+              <span>목표 이익률 <output id="s-margin-out">30%</output></span>
+              <input id="s-margin" type="range" min="0" max="60" step="1">
+              <small class="sub">판매가 대비. 1만 원에 팔아 3천 원이 남으면 30%예요.</small>
+            </label>
+          </div>
+
+          <div class="sale-result" aria-live="polite">
+            <h3>권장 판매가</h3>
+            <div class="total"><span id="s-price">-</span><small id="s-price-sub"></small></div>
+            <ul class="breakdown" id="s-costs"></ul>
+            <p class="sub" id="s-breakeven"></p>
+
+            <label class="field own-price">
+              <span>내가 정한 가격으로 확인하기</span>
+              <div class="unit-input"><input id="s-own" inputmode="numeric" placeholder="예: 8,900" autocomplete="off"><em>원</em></div>
+            </label>
+            <div class="compare" id="s-own-result" hidden></div>
+          </div>
+        </div>
+
+        <details class="checklist">
+          <summary>판매 전 체크리스트 ⚠️</summary>
+          <ul>
+            <li><b>모델 라이선스</b> — 남이 만든 모델이라면 라이선스를 꼭 확인하세요. <b>CC BY-NC</b> 계열과 MakerWorld 기본 라이선스(Standard Digital File License) 모델은 출력물을 팔 수 없어요. CC BY·CC BY-SA, 상업 라이선스를 허용한 모델, 직접 만든 모델은 판매할 수 있어요. 판매 전에 모델 페이지 라이선스를 캡처해 두면 좋아요.</li>
+            <li><b>어린이제품 KC 인증</b> — 만 13세 이하 어린이가 쓸 수 있는 장난감·문구 등은 개인 판매라도 KC 인증 대상이 될 수 있고, 위반 시 처벌이 무거워요.</li>
+            <li><b>통신판매업 신고</b> — 직전 연도 거래 50회 미만이거나 간이과세자면 신고가 면제돼요. 다만 오픈마켓은 입점할 때 신고증을 요구할 수 있어요.</li>
+            <li><b>세금</b> — 꾸준히 판매하면 사업자등록과 부가세·소득세 신고가 필요할 수 있어요. 이 계산기의 판매가에는 세금이 들어 있지 않아요.</li>
+          </ul>
+          <p class="sub">법률 자문이 아닌 일반 안내예요. 정확한 판단은 국가기술표준원(어린이제품), 관할 시·군·구청(통신판매업), 세무서에 확인하세요. 수수료율도 판매자센터에서 최종 확인하세요.</p>
+        </details>
+      </div>
+    </details>
+
+    <!-- 프린터 설정 -->
+    <details class="card settings" id="printer-box">
+      <summary><h2>내 프린터</h2><span class="sub" id="printer-summary"></span></summary>
+      <div class="settings-body">
+        <div class="printer-tabs" id="printer-tabs" role="tablist" aria-label="저장한 프린터"></div>
+
+        <div class="row2">
+          <label class="field">
+            <span>기종</span>
+            <select id="p-preset"></select>
+          </label>
+          <label class="field">
+            <span>이름</span>
+            <input id="p-name" autocomplete="off" maxlength="40">
+          </label>
+        </div>
+
+        <div class="field">
+          <span id="power-label">평균 소비전력 <span class="badge" id="p-source"></span></span>
+          <div class="power-grid" role="group" aria-labelledby="power-label" id="power-grid"></div>
+          <small class="sub" id="p-note"></small>
+          <small class="sub">비어 있는 재료는 비슷한 재료(또는 PLA) 값을 씁니다. 최대 전력이 아니라 출력 중 <b>평균</b>이에요.</small>
+        </div>
+
+        <label class="check">
+          <input type="checkbox" id="p-dep">
+          <span>프린터 감가상각 포함 <small class="sub">(프린터 값도 쓰는 만큼 원가로 나눠 넣기)</small></span>
+        </label>
+        <div class="row2" id="dep-fields">
+          <label class="field">
+            <span>구매 가격</span>
+            <div class="unit-input"><input id="p-price" inputmode="numeric" placeholder="구매가 입력" autocomplete="off"><em>원</em></div>
+          </label>
+          <label class="field">
+            <span>예상 수명</span>
+            <div class="unit-input"><input id="p-life" inputmode="numeric" autocomplete="off"><em>시간</em></div>
+          </label>
+        </div>
+        <label class="field">
+          <span>유지비 <small class="opt">(노즐·빌드판·윤활유 등)</small></span>
+          <div class="unit-input wide"><input id="p-upkeep" inputmode="decimal" autocomplete="off"><em>원/시간</em></div>
+        </label>
+
+        <div class="actions tight">
+          <button type="button" id="p-reset" class="btn ghost small">기종 기본 전력으로</button>
+          <button type="button" id="p-delete" class="btn ghost small danger">이 프린터 삭제</button>
+        </div>
+
+        <div class="add-printer">
+          <label class="field">
+            <span>프린터 추가</span>
+            <div class="inline">
+              <select id="add-preset" aria-label="추가할 기종"></select>
+              <button type="button" id="add-printer" class="btn small">추가</button>
+            </div>
+          </label>
+        </div>
+      </div>
+    </details>
+
+    <details class="card settings" id="power-box">
+      <summary><h2>전기 요금</h2><span class="sub" id="rate-summary"></span></summary>
+      <div class="settings-body">
+        <label class="field">
+          <span>전기 단가 <small class="opt">(모든 프린터 공통)</small></span>
+          <div class="unit-input wide"><input id="rate" inputmode="decimal" autocomplete="off"><em>원/kWh</em></div>
+          <div class="chips" id="rate-chips"></div>
+          <small class="sub">주택용 누진 구간 근사치(부가세·기금 제외). 고지서의 사용량 구간에 맞춰 고르세요.</small>
+        </label>
+      </div>
+    </details>
+
+    <details class="card settings" id="filament-box">
+      <summary><h2>내 필라멘트</h2><span class="sub" id="filament-summary"></span></summary>
+      <div class="settings-body">
+        <p class="hint">기본 가격은 대략적인 값이에요. 실제로 산 가격으로 바꾸면 더 정확해집니다. <b>종류</b>에 따라 프린터 전력값이 달라져요.</p>
+        <div class="fil-head" aria-hidden="true"><span>이름</span><span>종류</span><span>스풀 가격</span><span>무게(g)</span><span>1g당</span><span></span></div>
+        <ul class="fil-list" id="fil-list"></ul>
+        <button type="button" id="fil-add" class="btn ghost small">+ 필라멘트 추가</button>
+      </div>
+    </details>
+
+    <section class="note">
+      <h2>계산 방법</h2>
+      <ul>
+        <li><b>필라멘트비</b> = 사용량(g) × 스풀 가격 ÷ 스풀 무게</li>
+        <li><b>전기료</b> = 출력 시간 × 소비전력(kW) × 전기 단가 — 소비전력은 기종·재료별 출력 중 평균값</li>
+        <li><b>감가상각</b> = 출력 시간 × 프린터 가격 ÷ 예상 수명</li>
+        <li><b>실패 대비</b> = 실패율 r 일 때 성공 한 번에 평균 1 ÷ (1 − r)번 출력 → 합계 ÷ (1 − r)</li>
+      </ul>
+      <p class="sub">소비전력 출처: Bambu Lab 위키 실측 표, Prusa 공식 FAQ·사양, Igor'sLAB 리뷰 실측. ‘추정’ 기종은 평균 자료가 없어 같은 구조 기종을 기준으로 잡은 값이에요. 전력 측정 콘센트로 직접 재면 가장 정확합니다.</p>
+      <p class="sub">설정은 이 브라우저에만 저장되고 어디에도 전송되지 않습니다.</p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p id="affiliate-note" class="sub" hidden>이 사이트의 일부 구매 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>
+    <p class="sub">PrintCost Lab v<span id="version">0.3.0</span> · 계산 결과는 추정치입니다.</p>
+  </footer>
+
+  <script src="logic.js?v=__VERSION__"></script>
+  <script src="app.js?v=__VERSION__"></script>
+</body>
+</html>
